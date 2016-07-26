@@ -2,26 +2,42 @@
 
 /* function declare */
 void handle(int fd);
+void *handle_wrapper(void *args);
 void read_requesthdrs(rio_t *rp);
 int  parse_uri(char *uri, char *filename, char *cgiargs);
 void serve_static(int fd, char *filename, int filesize);
 void get_filetype(char *filename, char *filetype);
 void serve_dynamic(int fd, char *filename, char *cgiargs);
 void clienterror(int fd, char *cause, char *errnum, char *shortmsg, char *longmsg);
+void Log(const char *msg);
+void init_server();
+
+char www_path[MAXBUF],log_path[MAXBUF],port_number[MAXBUF];
 
 int main(int argc, char **argv) 
 {
-    int listenfd, connfd, port, clientlen;
+    int listenfd, connfd, clientlen;
+
     struct sockaddr_in clientaddr;
 
-    if (argc != 2) {
-        port = 80;
-    }
-    else{
-        port = atoi(argv[1]);
-    }
+    char* conf;
+    char* conf_file = "/conf/tws.conf";
+    char cwd[MAXBUF];   
 
-    listenfd = open_listenfd(port);
+    getcwd(cwd,sizeof(cwd)); 
+    strcat(cwd,conf_file);
+
+    conf = cwd;
+
+    
+    get_conf(conf, "dirs", "www", www_path);
+    get_conf(conf, "dirs", "log", log_path);
+    get_conf(conf, "globals", "port", port_number);
+
+    init_server();
+    Log("XXXXX");
+
+    listenfd = open_listenfd(atoi(port_number));
     if(listenfd < 0){
         error("open listenfd failed !");
     }
@@ -29,13 +45,38 @@ int main(int argc, char **argv)
     while (1) {
         clientlen = sizeof(clientaddr);
         connfd = Accept(listenfd, (struct sockaddr *)&clientaddr, &clientlen);
+
+        /*
+        // no threading
         handle(connfd);
-        if(close(connfd) <0){
-            error("close failed !");
-        }
+        */
+
+        pthread_t pt;
+        pthread_create(&pt, NULL, handle_wrapper, &connfd);
+        pthread_join(pt, NULL);
     }
 }
 
+
+void init_server(){
+    time_t timep;  
+    struct tm *p;  
+    time(&timep);  
+    p = gmtime(&timep); 
+  
+    char str[MAXBUF];
+    sprintf(str,"/%d-%d-%d.log",1900+p->tm_year,1+p->tm_mon,p->tm_mday);
+
+    strcat(log_path, str);
+    printf("%s\n", log_path);
+}
+
+void *handle_wrapper(void *args)
+{
+    int fd;
+    fd = (int)(*((int*)args));
+    handle(fd);
+}
 
 void handle(int fd) 
 {
@@ -45,8 +86,10 @@ void handle(int fd)
     char filename[MAXLINE], cgiargs[MAXLINE];
     
     rio_t rio;
-    Rio_readinitb(&rio, fd);
-    Rio_readlineb(&rio, buf, MAXLINE);
+    rio_readinitb(&rio, fd);
+    if( rio_readlineb(&rio, buf, MAXLINE) < 0 ){
+        error("rio_readlineb error");
+    }
 
     // HTTP request line
     sscanf(buf, "%s %s %s", method, uri, version);
@@ -60,7 +103,7 @@ void handle(int fd)
         return;
     }
     
-    //read_requesthdrs(&rio);  // just print
+    read_requesthdrs(&rio);  // just print
 
     is_static = parse_uri(uri, filename, cgiargs);
     if (stat(filename, &sbuf) < 0) {
@@ -81,6 +124,11 @@ void handle(int fd)
             return;
         }
         serve_dynamic(fd, filename, cgiargs);
+    }
+
+    if(close(fd) <0){
+        // todo log
+        error("close failed !");
     }
 }
 
@@ -107,7 +155,8 @@ int parse_uri(char *uri, char *filename, char *cgiargs)
 
     if (!strstr(uri, "cgi-bin")) {  // Static content
         strcpy(cgiargs, "");
-        strcpy(filename, ".");
+        //strcpy(filename, ".");  // !!
+        strcpy(filename,www_path);
         strcat(filename, uri);
 	   
         if (uri[strlen(uri)-1] == '/')
@@ -163,6 +212,9 @@ void get_filetype(char *filename, char *filetype)
     }
     else if (strstr(filename, ".jpg")){
 	   strcpy(filetype, "image/jpeg");
+    }
+    else if (strstr(filename, ".png")){
+       strcpy(filetype, "image/png");
     }
     else if (strstr(filename, ".ico")){
        strcpy(filetype, "image/x-icon");
@@ -222,3 +274,12 @@ void clienterror(int fd, char *cause, char *errnum,
     Rio_writen(fd, body, strlen(body));
 }
 /* $end clienterror */
+
+
+void Log(const char *msg){
+    FILE *fp;
+    fp = fopen(log_path, "w+");
+    //fprintf(fp, "This is testing for fprintf...");
+    fputs(msg, fp);
+    fclose(fp);
+}

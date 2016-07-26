@@ -1,5 +1,7 @@
 #include "base.h"
 
+
+
 void error(char *msg)
 {
     fprintf(stderr, "%s: %s\n", msg, strerror(errno));
@@ -205,10 +207,10 @@ void Rio_writen(int fd, void *usrbuf, size_t n)
 	error("Rio_writen error");
 }
 
-void Rio_readinitb(rio_t *rp, int fd)
+/*void Rio_readinitb(rio_t *rp, int fd)
 {
     rio_readinitb(rp, fd);
-} 
+} */
 
 ssize_t Rio_readnb(rio_t *rp, void *usrbuf, size_t n) 
 {
@@ -226,7 +228,7 @@ ssize_t Rio_readlineb(rio_t *rp, void *usrbuf, size_t maxlen)
     if ((rc = rio_readlineb(rp, usrbuf, maxlen)) < 0)
 	error("Rio_readlineb error");
     return rc;
-} 
+}
 
 int open_listenfd(int port) 
 {
@@ -255,16 +257,104 @@ int open_listenfd(int port)
     return listenfd;
 }
 
+
 /*
-int Open_listenfd(int port) 
-{
-    int rc;
-
-    if ((rc = open_listenfd(port)) < 0)
-	unix_error("Open_listenfd error");
-    return rc;
-}
 */
+char* left_trim(char * stro, const char *stri){
+    if( stri == NULL || stro == NULL || stri == stro ){
+        error("invalid input in left_trim");
+    }
 
+    for (NULL; *stri != '\0' && isspace(*stri); ++stri){
+      ;
+    }
+    return strcpy(stro, stri);
+}
+ 
+char* trim(char* stro, const char* stri){
+    char *p = NULL;
+    if( stri == NULL || stro == NULL){
+        error("invalid input in trim");
+    }
+    
+    left_trim(stro, stri);
+    
+    for(p = stro + strlen(stro) - 1;p >= stro && isspace(*p); --p){
+      ;
+    }
 
+    *(++p) = '\0';
+    return stro;
+}
+ 
+ 
+int get_conf(char *file, char *group, char *item, char *conf ){
+    char group_name[MAXBUF],item_name[MAXBUF],*buf,*c,buf_i[MAXBUF], buf_o[MAXBUF];
+    FILE *fp;
+    int found=0;
+
+    if( (fp=fopen( file,"r" ))==NULL ){
+      printf( "open tws config file failed !\n");
+      return(-1);
+    }
+    
+    fseek( fp, 0, SEEK_SET );
+    memset( group_name, 0, sizeof(group_name) );
+    sprintf( group_name,"[%s]", group );
+ 
+    while( !feof(fp) && fgets( buf_i, MAXBUF, fp )!=NULL ){
+        left_trim(buf_o, buf_i);
+        if( strlen(buf_o) <= 0 ){
+            continue;
+        }
+        buf = NULL;
+        buf = buf_o;
+ 
+        if( found == 0 ){
+            if( buf[0] != '[' ) {
+                continue;
+            } else if ( strncmp(buf,group_name,strlen(group_name))==0 ){
+                found = 1;
+                continue;
+            }
+        } else if( found == 1 ){
+            if( buf[0] == '#' ){
+                continue;
+            } else if ( buf[0] == '[' ) {
+                break;
+            } else {
+                if( (c = (char*)strchr(buf, '=')) == NULL ){
+                    continue;
+                }
+                memset( item_name, 0, sizeof(item_name) );
+                sscanf( buf, "%[^=|^ |^\t]", item_name );
+                if( strcmp(item_name, item) == 0 ){
+                    sscanf( ++c, "%[^\n]", conf );
+                    char *KeyVal_o = (char *)malloc(strlen(conf) + 1);
+                    if(KeyVal_o != NULL){
+                      memset(KeyVal_o, 0, sizeof(KeyVal_o));
+                      trim(KeyVal_o, conf);
+                      if(KeyVal_o && strlen(KeyVal_o) > 0){
+                        strcpy(conf, KeyVal_o);
+                      }
+                      free(KeyVal_o);
+                      KeyVal_o = NULL;
+                    }
+                    found = 2;
+                    break;
+                } else {
+                    continue;
+                }
+            }
+        }
+    }
+    
+    fclose( fp );
+    if( found == 2 ){
+      return(0);
+    }
+    else{
+      return(-1);
+    }
+}
 

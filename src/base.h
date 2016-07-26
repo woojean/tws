@@ -19,6 +19,7 @@
 #include <netdb.h>
 #include <netinet/in.h>  // !! struct sockaddr_in, socklen_t
 #include <arpa/inet.h>
+#include <time.h>
 
 #define RIO_BUFSIZE 8192
 typedef struct {
@@ -71,4 +72,9 @@ int open_listenfd(int portno);
 
 /* Wrappers for client/server helper functions */
 int Open_clientfd(char *hostname, int port);
- 
+
+
+/**/
+char* left_trim(char * stro, const char *stri);
+char* trim(char* stro, const char* stri);
+int get_conf(char *file, char *group, char *item, char *conf );

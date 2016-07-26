@@ -1,1 +1,14 @@
-cc
+
+[globals]
+# port number
+port = 80
+
+[dirs]
+# website dir
+www = /vagrant/www/github/tws/demo/public
+
+# log dir
+log = /vagrant/www/github/tws/demo/log
+
+
+
