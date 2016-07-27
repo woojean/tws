@@ -4,7 +4,7 @@
 ## 编译
 在项目中事先写好了一个脚本用于执行编译：
 ```./build.sh```
-编译完成后，会在bin目录下生成一个可执行文件`tws`
+编译完成后，会在bin目录下生成一个可执行文件tws
 
 也可以手工执行编译：
 ```gcc -o bin/tws -lrt src/tws.c src/base.c```
@@ -27,6 +27,7 @@ log = /vagrant/www/github/tws/demo/log
 [extensions]
 php = /usr/bin/php
 ```
+
 其中： 
 
 **port** - 指定服务器将要监听的端口（一般为80）； 
@@ -41,9 +42,6 @@ php = /usr/bin/php
 ## 启动服务器
 ```./bin/tws```
 
-
-## 启动服务器
-```./bin/tws```
 
 之后就可以访问服务器上的资源了，根据如上对demo项目的配置，可以访问项目首页：
 http://192.168.1.2:88/index.html
