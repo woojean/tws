@@ -47,4 +47,5 @@ php = /usr/bin/php
 
 之后就可以访问服务器上的资源了，根据如上对demo项目的配置，可以访问项目首页：
 http://192.168.1.2:88/index.html
+![image](https://github.com/woojean/tws/blob/master/images/html.png)
 
