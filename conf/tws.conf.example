@@ -1,7 +1,7 @@
 
 [globals]
 # port number
-port = 80
+port = 88
 
 [dirs]
 # website dir
@@ -10,5 +10,8 @@ www = /vagrant/www/github/tws/demo/public
 # log dir
 log = /vagrant/www/github/tws/demo/log
 
+
+[extensions]
+php = /usr/bin/php
 
 

@@ -1,12 +1,13 @@
 #!/bin/bash
 
-echo "start building"
+echo "building..."
 os=`uname -s`
 
 if [ $os = "Linux" ] ; then
-  echo "Linux" 
+	echo "."
   `gcc -o bin/tws -lrt src/tws.c src/base.c`
 else 
+	echo "."
   `gcc -o bin/tws src/tws.c src/base.c`
 fi
-
+echo "finished !"

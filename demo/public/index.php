@@ -8,6 +8,23 @@
     <meta name="viewport" content="width=device-width">
     </head>
     <body>
-    <h2>Test Page</h2>
+    <h2>This is a php file !</h2>
+
+<?php
+date_default_timezone_set('prc');
+echo "Now : ";
+echo date('Y-m-d H:i:s',time());
+?>
     </body>
 </html>
+
+
+ 
+
+
+
+
+
+
+
+

@@ -1,6 +1,5 @@
 #include "base.h"
 
-/* function declare */
 void handle(int fd);
 void *handle_wrapper(void *args);
 void read_requesthdrs(rio_t *rp);
@@ -12,37 +11,47 @@ void clienterror(int fd, char *cause, char *errnum, char *shortmsg, char *longms
 void Log(const char *msg);
 void init_server();
 
-char www_path[MAXBUF],log_path[MAXBUF],port_number[MAXBUF];
+int listenfd;
+char www_path[MAXBUF], log_path[MAXBUF], port_number[MAXBUF], php[MAXBUF];
 
 int main(int argc, char **argv) 
 {
-    int listenfd, connfd, clientlen;
-
-    struct sockaddr_in clientaddr;
-
+    // parse config
     char* conf;
     char* conf_file = "/conf/tws.conf";
     char cwd[MAXBUF];   
-
+    
     getcwd(cwd,sizeof(cwd)); 
     strcat(cwd,conf_file);
-
     conf = cwd;
-
     
     get_conf(conf, "dirs", "www", www_path);
     get_conf(conf, "dirs", "log", log_path);
     get_conf(conf, "globals", "port", port_number);
+    get_conf(conf, "extensions", "php", php);
 
-    init_server();
-    Log("XXXXX");
+    // init log set
+    time_t timep;  
+    struct tm *p;  
+    time(&timep);  
+    p = gmtime(&timep); 
+  
+    char str[MAXBUF];
+    sprintf(str,"/%d-%d-%d.log",1900+p->tm_year,1+p->tm_mon,p->tm_mday);
+    strcat(log_path, str);
+
+    Log("Server started !\n======================================\n");
 
     listenfd = open_listenfd(atoi(port_number));
     if(listenfd < 0){
         error("open listenfd failed !");
     }
+    Log("Listening...\n--------------------------------------\n");
 
     while (1) {
+        int connfd, clientlen;
+        struct sockaddr_in clientaddr;
+
         clientlen = sizeof(clientaddr);
         connfd = Accept(listenfd, (struct sockaddr *)&clientaddr, &clientlen);
 
@@ -57,19 +66,6 @@ int main(int argc, char **argv)
     }
 }
 
-
-void init_server(){
-    time_t timep;  
-    struct tm *p;  
-    time(&timep);  
-    p = gmtime(&timep); 
-  
-    char str[MAXBUF];
-    sprintf(str,"/%d-%d-%d.log",1900+p->tm_year,1+p->tm_mon,p->tm_mday);
-
-    strcat(log_path, str);
-    printf("%s\n", log_path);
-}
 
 void *handle_wrapper(void *args)
 {
@@ -94,8 +90,9 @@ void handle(int fd)
     // HTTP request line
     sscanf(buf, "%s %s %s", method, uri, version);
 
-    if (0 != strcasecmp(method, "GET")  
-        && 0 != strcasecmp(method, "POST")) {
+    if (0 != strcasecmp(method, "GET") && 0 != strcasecmp(method, "POST")) {
+        Log(method);
+        Log(" / Method haven't implemented !\n");
         clienterror(fd, method, 
             "501", 
             "Not Implemented",
@@ -103,16 +100,19 @@ void handle(int fd)
         return;
     }
     
-    read_requesthdrs(&rio);  // just print
-
     is_static = parse_uri(uri, filename, cgiargs);
+
     if (stat(filename, &sbuf) < 0) {
+        Log(filename);
+        Log(" / File not exist !\n");
         clienterror(fd, filename, "404", "Not found","file not exist !");
         return;
     }
 
     if (is_static) {
         if (!(S_ISREG(sbuf.st_mode)) || !(S_IRUSR & sbuf.st_mode)) {
+            Log(filename);
+            Log(" / No permission to read the file !\n");
             clienterror(fd, filename, "403", "Forbidden","No permission to read the file !");
             return;
         }
@@ -120,6 +120,8 @@ void handle(int fd)
     }
     else {
         if (!(S_ISREG(sbuf.st_mode)) || !(S_IXUSR & sbuf.st_mode)) {
+            Log(filename);
+            Log(" / Couldn't run the CGI program !\n");
             clienterror(fd, filename, "403", "Forbidden","Couldn't run the CGI program");
             return;
         }
@@ -128,34 +130,17 @@ void handle(int fd)
 
     if(close(fd) <0){
         // todo log
-        error("close failed !");
+        Log("Error:Server close failed !\n");
+        error(" / Close failed !");
     }
 }
 
-
-void read_requesthdrs(rio_t *rp) 
-{
-    char buf[MAXLINE];
-
-    Rio_readlineb(rp, buf, MAXLINE);
-    while(strcmp(buf, "\r\n")) {
-	   Rio_readlineb(rp, buf, MAXLINE);
-	   printf("%s", buf);
-    }
-    return;
-}
-
-/*
- * parse_uri - parse URI into filename and CGI args
- *             return 0 if dynamic content, 1 if static
- */
 int parse_uri(char *uri, char *filename, char *cgiargs) 
 {
     char *ptr;
 
-    if (!strstr(uri, "cgi-bin")) {  // Static content
+    if (!strstr(uri, ".php")) {  // Static content
         strcpy(cgiargs, "");
-        //strcpy(filename, ".");  // !!
         strcpy(filename,www_path);
         strcat(filename, uri);
 	   
@@ -173,7 +158,7 @@ int parse_uri(char *uri, char *filename, char *cgiargs)
         else{ 
             strcpy(cgiargs, "");
         }
-        strcpy(filename, ".");
+        strcpy(filename, www_path);
         strcat(filename, uri);
         return 0;
     }
@@ -195,12 +180,36 @@ void serve_static(int fd, char *filename, int filesize)
     srcfd = Open(filename, O_RDONLY, 0);
     srcp = Mmap(0, filesize, PROT_READ, MAP_PRIVATE, srcfd, 0);
     if(close(srcfd) <0){
+        Log("close failed !");
         error("close failed !");
     }
     Rio_writen(fd, srcp, filesize);
+    //strcat(buf,srcp);
     Munmap(srcp, filesize);
 }
 
+void serve_dynamic(int fd, char *filename, char *cgiargs) 
+{
+    char cmd[MAXLINE],phpbuf[MAXLINE], buf[MAXLINE], *emptylist[] = { NULL };
+
+    sprintf(buf, "HTTP/1.0 200 OK\r\n");
+    sprintf(buf, "%sServer: Tiny Web Server\r\n\r\n", buf);
+    
+    sprintf(cmd,"%s %s",php,filename);
+
+    FILE *phpfp = popen(cmd,"r"); 
+    if(NULL == phpfp){
+        sprintf(phpbuf, "php error !");
+    }
+    else{
+        int phpfd  =  fileno(phpfp);
+        rio_readn(phpfd, phpbuf, MAXBUF);
+    }  
+    pclose(phpfp);
+
+    strcat(buf,phpbuf);
+    Rio_writen(fd, buf, strlen(buf));
+}
 
 void get_filetype(char *filename, char *filetype) 
 {
@@ -216,42 +225,20 @@ void get_filetype(char *filename, char *filetype)
     else if (strstr(filename, ".png")){
        strcpy(filetype, "image/png");
     }
+    else if (strstr(filename, ".gif")){
+       strcpy(filetype, "image/gif");
+    }
     else if (strstr(filename, ".ico")){
        strcpy(filetype, "image/x-icon");
+    }
+    else if (strstr(filename, ".css")){
+       strcpy(filetype, "text/css");
     }
     else{
 	   strcpy(filetype, "text/plain");
     }
 }  
 
-/*
- * serve_dynamic - run a CGI program on behalf of the client
- */
-/* $begin serve_dynamic */
-void serve_dynamic(int fd, char *filename, char *cgiargs) 
-{
-    char buf[MAXLINE], *emptylist[] = { NULL };
-
-    /* Return first part of HTTP response */
-    sprintf(buf, "HTTP/1.0 200 OK\r\n"); 
-    Rio_writen(fd, buf, strlen(buf));
-    sprintf(buf, "Server: Tiny Web Server\r\n");
-    Rio_writen(fd, buf, strlen(buf));
-  
-    if (Fork() == 0) { /* child */ //line:netp:servedynamic:fork
-	/* Real server would set all CGI vars here */
-	setenv("QUERY_STRING", cgiargs, 1); //line:netp:servedynamic:setenv
-	Dup2(fd, STDOUT_FILENO);         /* Redirect stdout to client */ //line:netp:servedynamic:dup2
-	Execve(filename, emptylist, environ); /* Run CGI program */ //line:netp:servedynamic:execve
-    }
-    Wait(NULL); /* Parent waits for and reaps child */ //line:netp:servedynamic:wait
-}
-/* $end serve_dynamic */
-
-/*
- * clienterror - returns an error message to the client
- */
-/* $begin clienterror */
 void clienterror(int fd, char *cause, char *errnum, 
 		 char *shortmsg, char *longmsg) 
 {
@@ -273,13 +260,12 @@ void clienterror(int fd, char *cause, char *errnum,
     Rio_writen(fd, buf, strlen(buf));
     Rio_writen(fd, body, strlen(body));
 }
-/* $end clienterror */
 
 
 void Log(const char *msg){
     FILE *fp;
-    fp = fopen(log_path, "w+");
-    //fprintf(fp, "This is testing for fprintf...");
+    fp = fopen(log_path, "a+");
     fputs(msg, fp);
+    fputs("\n", fp);
     fclose(fp);
 }
