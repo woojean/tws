@@ -14,7 +14,7 @@ gcc -o bin/tws -lrt src/tws.c src/base.c
 ```
 
 ## 配置服务器
-服务器的配置文件在conf目录下，一个具体的示例如下：
+服务器的配置文件在conf目录下，假设tws项目在本地的当前路径为/vagrant/www/github/tws，一个具体的示例如下：
 ```
 [globals]
 # port number
@@ -49,7 +49,7 @@ php = /usr/bin/php
 ```
 
 
-之后就可以访问服务器上的资源了，根据如上对demo项目的配置，可以访问项目首页： 
+之后就可以访问服务器上的资源了。假设本机的IP是192.168.1.2，根据如上对demo项目的配置，可以访问项目首页： 
 http://192.168.1.2:88/index.html 
 
 ![image](https://github.com/woojean/tws/blob/master/images/html.png)
