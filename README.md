@@ -3,24 +3,28 @@
 
 ## 编译
 在项目中事先写好了一个脚本用于执行编译：
-```./build.sh```
-编译完成后，会在bin目录下生成一个可执行文件tws
+```
+./build.sh
+```
+编译完成后，会在bin目录下生成一个可执行文件`tws`
 
 也可以手工执行编译：
-```gcc -o bin/tws -lrt src/tws.c src/base.c```
+```
+gcc -o bin/tws -lrt src/tws.c src/base.c
+```
 
 ## 配置服务器
 服务器的配置文件在conf目录下，一个具体的示例如下：
 ```
 [globals]
-\# port number
+# port number
 port = 88
 
 [dirs]
-\# website dir
+# website dir
 www = /vagrant/www/github/tws/demo/public
 
-\# log dir
+# log dir
 log = /vagrant/www/github/tws/demo/log
 
 
@@ -40,7 +44,9 @@ php = /usr/bin/php
 
 
 ## 启动服务器
-```./bin/tws```
+```
+./bin/tws
+```
 
 
 之后就可以访问服务器上的资源了，根据如上对demo项目的配置，可以访问项目首页：
